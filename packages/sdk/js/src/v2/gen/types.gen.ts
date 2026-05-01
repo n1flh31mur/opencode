@@ -29,9 +29,11 @@ export type Project = {
 }
 
 export type EventProjectUpdated = {
+  id: string
   type: "project.updated"
   properties: Project
 }
+<<<<<<< HEAD
 
 export type EventServerInstanceDisposed = {
   type: "server.instance.disposed"
@@ -6488,3 +6490,5 @@ export type FormatterStatusResponses = {
 }
 
 export type FormatterStatusResponse = FormatterStatusResponses[keyof FormatterStatusResponses]
+=======
+>>>>>>> 13afcef87 (core: add unique IDs to all events for reliable tracking and debugging)
