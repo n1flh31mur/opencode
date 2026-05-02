@@ -1,4 +1,3 @@
-import { Plugin } from "../plugin"
 import { Format } from "../format"
 import { LSP } from "@/lsp/lsp"
 import { File } from "../file"
@@ -31,7 +30,6 @@ export const layer = Layer.effect(
     const fileWatcher = yield* FileWatcher.Service
     const format = yield* Format.Service
     const lsp = yield* LSP.Service
-    const plugin = yield* Plugin.Service
     const shareNext = yield* ShareNext.Service
     const snapshot = yield* Snapshot.Service
     const vcs = yield* Vcs.Service
@@ -41,8 +39,6 @@ export const layer = Layer.effect(
       yield* Effect.logInfo("bootstrapping", { directory: ctx.directory })
       // everything depends on config so eager load it for nice traces
       yield* config.get()
-      // Plugin can mutate config so it has to be initialized before anything else.
-      yield* plugin.init()
       yield* Effect.all(
         [lsp, shareNext, format, file, fileWatcher, vcs, snapshot].map((s) => Effect.forkDetach(s.init())),
       ).pipe(Effect.withSpan("InstanceBootstrap.init"))
@@ -67,7 +63,6 @@ export const defaultLayer: Layer.Layer<Service> = layer.pipe(
     FileWatcher.defaultLayer,
     Format.defaultLayer,
     LSP.defaultLayer,
-    Plugin.defaultLayer,
     Project.defaultLayer,
     ShareNext.defaultLayer,
     Snapshot.defaultLayer,
