@@ -1,4 +1,5 @@
-import "@opentui/solid/runtime-plugin-support"
+import { runtimeModules as keymapRuntimeModules } from "@opentui/keymap/runtime-modules"
+import { ensureRuntimePluginSupport } from "@opentui/solid/runtime-plugin-support/configure"
 import {
   type TuiDispose,
   type TuiPlugin,
@@ -38,6 +39,8 @@ import { INTERNAL_TUI_PLUGINS, type InternalTuiPlugin } from "./internal"
 import { setupSlots, Slot as View } from "./slots"
 import type { HostPluginApi, HostSlots } from "./slots"
 import { ConfigPlugin } from "@/config/plugin"
+
+ensureRuntimePluginSupport({ additional: keymapRuntimeModules })
 
 type PluginLoad = {
   options: ConfigPlugin.Options | undefined
@@ -327,14 +330,16 @@ function createPluginScope(load: PluginLoad, id: string) {
 
   const track = (fn: (() => void) | undefined) => {
     if (!fn) return () => {}
-    const off = onDispose(fn)
     let drop = false
-    return () => {
+    let off = () => {}
+    const wrapped = () => {
       if (drop) return
       drop = true
       off()
       fn()
     }
+    off = onDispose(wrapped)
+    return wrapped
   }
 
   const lifecycle: TuiPluginApi["lifecycle"] = {
@@ -484,17 +489,6 @@ function pluginApi(runtime: RuntimeState, plugin: PluginEntry, scope: PluginScop
   const api = runtime.api
   const host = runtime.slots
   const load = plugin.load
-  const command: TuiPluginApi["command"] = {
-    register(cb) {
-      return scope.track(api.command.register(cb))
-    },
-    trigger(value) {
-      api.command.trigger(value)
-    },
-    show() {
-      api.command.show()
-    },
-  }
 
   const route: TuiPluginApi["route"] = {
     register(list) {
@@ -518,6 +512,75 @@ function pluginApi(runtime: RuntimeState, plugin: PluginEntry, scope: PluginScop
     },
   }
 
+  const keymap: TuiPluginApi["keymap"] = Object.assign(Object.create(api.keymap), {
+    acquireResource(...args: Parameters<TuiPluginApi["keymap"]["acquireResource"]>) {
+      return scope.track(api.keymap.acquireResource(...args))
+    },
+    registerLayer(...args: Parameters<TuiPluginApi["keymap"]["registerLayer"]>) {
+      return scope.track(api.keymap.registerLayer(...args))
+    },
+    registerLayerFields(...args: Parameters<TuiPluginApi["keymap"]["registerLayerFields"]>) {
+      return scope.track(api.keymap.registerLayerFields(...args))
+    },
+    prependBindingTransformer(...args: Parameters<TuiPluginApi["keymap"]["prependBindingTransformer"]>) {
+      return scope.track(api.keymap.prependBindingTransformer(...args))
+    },
+    appendBindingTransformer(...args: Parameters<TuiPluginApi["keymap"]["appendBindingTransformer"]>) {
+      return scope.track(api.keymap.appendBindingTransformer(...args))
+    },
+    prependBindingParser(...args: Parameters<TuiPluginApi["keymap"]["prependBindingParser"]>) {
+      return scope.track(api.keymap.prependBindingParser(...args))
+    },
+    appendBindingParser(...args: Parameters<TuiPluginApi["keymap"]["appendBindingParser"]>) {
+      return scope.track(api.keymap.appendBindingParser(...args))
+    },
+    registerToken(...args: Parameters<TuiPluginApi["keymap"]["registerToken"]>) {
+      return scope.track(api.keymap.registerToken(...args))
+    },
+    prependBindingExpander(...args: Parameters<TuiPluginApi["keymap"]["prependBindingExpander"]>) {
+      return scope.track(api.keymap.prependBindingExpander(...args))
+    },
+    appendBindingExpander(...args: Parameters<TuiPluginApi["keymap"]["appendBindingExpander"]>) {
+      return scope.track(api.keymap.appendBindingExpander(...args))
+    },
+    registerBindingFields(...args: Parameters<TuiPluginApi["keymap"]["registerBindingFields"]>) {
+      return scope.track(api.keymap.registerBindingFields(...args))
+    },
+    registerCommandFields(...args: Parameters<TuiPluginApi["keymap"]["registerCommandFields"]>) {
+      return scope.track(api.keymap.registerCommandFields(...args))
+    },
+    prependCommandResolver(...args: Parameters<TuiPluginApi["keymap"]["prependCommandResolver"]>) {
+      return scope.track(api.keymap.prependCommandResolver(...args))
+    },
+    appendCommandResolver(...args: Parameters<TuiPluginApi["keymap"]["appendCommandResolver"]>) {
+      return scope.track(api.keymap.appendCommandResolver(...args))
+    },
+    prependLayerAnalyzer(...args: Parameters<TuiPluginApi["keymap"]["prependLayerAnalyzer"]>) {
+      return scope.track(api.keymap.prependLayerAnalyzer(...args))
+    },
+    appendLayerAnalyzer(...args: Parameters<TuiPluginApi["keymap"]["appendLayerAnalyzer"]>) {
+      return scope.track(api.keymap.appendLayerAnalyzer(...args))
+    },
+    intercept(...args: Parameters<TuiPluginApi["keymap"]["intercept"]>) {
+      return scope.track(api.keymap.intercept(...args))
+    },
+    on(...args: Parameters<TuiPluginApi["keymap"]["on"]>) {
+      return scope.track(api.keymap.on(...args))
+    },
+    prependEventMatchResolver(...args: Parameters<TuiPluginApi["keymap"]["prependEventMatchResolver"]>) {
+      return scope.track(api.keymap.prependEventMatchResolver(...args))
+    },
+    appendEventMatchResolver(...args: Parameters<TuiPluginApi["keymap"]["appendEventMatchResolver"]>) {
+      return scope.track(api.keymap.appendEventMatchResolver(...args))
+    },
+    prependDisambiguationResolver(...args: Parameters<TuiPluginApi["keymap"]["prependDisambiguationResolver"]>) {
+      return scope.track(api.keymap.prependDisambiguationResolver(...args))
+    },
+    appendDisambiguationResolver(...args: Parameters<TuiPluginApi["keymap"]["appendDisambiguationResolver"]>) {
+      return scope.track(api.keymap.appendDisambiguationResolver(...args))
+    },
+  })
+
   let count = 0
 
   const slots: TuiPluginApi["slots"] = {
@@ -531,10 +594,10 @@ function pluginApi(runtime: RuntimeState, plugin: PluginEntry, scope: PluginScop
 
   return {
     app: api.app,
-    command,
+    keys: api.keys,
+    keymap,
     route,
     ui: api.ui,
-    keybind: api.keybind,
     tuiConfig: api.tuiConfig,
     kv: api.kv,
     state: api.state,

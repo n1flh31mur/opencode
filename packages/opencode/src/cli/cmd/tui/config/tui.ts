@@ -1,6 +1,8 @@
 export * as TuiConfig from "./tui"
 
 import z from "zod"
+import type { KeyEvent, Renderable } from "@opentui/core"
+import { resolveBindingSections, type BindingSectionsConfig } from "@opentui/keymap/extras"
 import { mergeDeep, unique } from "remeda"
 import { Context, Effect, Fiber, Layer } from "effect"
 import { ConfigParse } from "@/config/parse"
@@ -20,27 +22,39 @@ import { Filesystem } from "@/util/filesystem"
 import * as Log from "@opencode-ai/core/util/log"
 import { ConfigVariable } from "@/config/variable"
 import { Npm } from "@opencode-ai/core/npm"
+import { LegacyKeymapTransform } from "./legacy-keymap-transform"
+import { KeymapSectionNames, type KeymapConfig, type KeymapInfo, type KeymapSection } from "./tui-schema"
 
 const log = Log.create({ service: "tui.config" })
 
 export const Info = TuiInfo
 
+type FileInfo = Omit<z.output<typeof Info>, "keymap"> & {
+  keymap?: KeymapConfig
+  plugin_origins?: ConfigPlugin.Origin[]
+}
+
 type Acc = {
-  result: Info
+  result: FileInfo
 }
 
 type State = {
-  config: Info
+  config: Resolved
   deps: Array<Fiber.Fiber<void, AppFileSystem.Error>>
 }
 
-export type Info = z.output<typeof Info> & {
+export type Info = Omit<FileInfo, "keymap"> & {
+  keymap?: KeymapConfig | KeymapInfo
+}
+
+export type Resolved = Omit<FileInfo, "keymap"> & {
+  keymap: KeymapInfo
   // Internal resolved plugin list used by runtime loading.
   plugin_origins?: ConfigPlugin.Origin[]
 }
 
 export interface Interface {
-  readonly get: () => Effect.Effect<Info>
+  readonly get: () => Effect.Effect<Resolved>
   readonly waitForDependencies: () => Effect.Effect<void>
 }
 
@@ -68,7 +82,7 @@ function normalize(raw: Record<string, unknown>) {
   }
 }
 
-async function resolvePlugins(config: Info, configFilepath: string) {
+async function resolvePlugins(config: FileInfo, configFilepath: string) {
   if (!config.plugin) return config
   for (let i = 0; i < config.plugin.length; i++) {
     config.plugin[i] = await ConfigPlugin.resolvePluginSpec(config.plugin[i], configFilepath)
@@ -140,11 +154,30 @@ const loadState = Effect.fn("TuiConfig.loadState")(function* (ctx: { directory: 
       ...ConfigKeybinds.Keybinds.shape.input_undo.parse(undefined).split(","),
     ]).join(",")
   }
-  acc.result.keybinds = ConfigKeybinds.Keybinds.parse(keybinds)
+  const parsedKeybinds = ConfigKeybinds.Keybinds.parse(keybinds)
+  const configuredKeymap = acc.result.keymap
+  const result: Resolved = {
+    ...acc.result,
+    keybinds: parsedKeybinds,
+    // `keybinds` is deprecated and will be removed in opencode v2.0. Keep it
+    // only as the legacy fallback; once `keymap` is configured, ignore
+    // `keybinds` for keymap resolution.
+    keymap: configuredKeymap
+      ? {
+          leader: !configuredKeymap.leader || configuredKeymap.leader === "none" ? "ctrl+x" : configuredKeymap.leader,
+          sections: resolveBindingSections<Renderable, KeyEvent, BindingSectionsConfig<Renderable, KeyEvent>, KeymapSection>(
+            configuredKeymap.sections ?? {},
+            {
+              sections: KeymapSectionNames,
+            },
+          ).sections,
+        }
+      : LegacyKeymapTransform.create(parsedKeybinds),
+  }
 
   return {
-    config: acc.result,
-    dirs: acc.result.plugin?.length ? dirs : [],
+    config: result,
+    dirs: result.plugin?.length ? dirs : [],
   }
 })
 
@@ -193,7 +226,7 @@ export async function get() {
   return runPromise((svc) => svc.get())
 }
 
-async function loadFile(filepath: string): Promise<Info> {
+async function loadFile(filepath: string): Promise<FileInfo> {
   const text = await ConfigPaths.readFile(filepath)
   if (!text) return {}
   return load(text, filepath).catch((error) => {
@@ -202,7 +235,7 @@ async function loadFile(filepath: string): Promise<Info> {
   })
 }
 
-async function load(text: string, configFilepath: string): Promise<Info> {
+async function load(text: string, configFilepath: string): Promise<FileInfo> {
   return ConfigVariable.substitute({ text, type: "path", path: configFilepath, missing: "empty" })
     .then((expanded) => ConfigParse.jsonc(expanded, configFilepath))
     .then((data) => {
