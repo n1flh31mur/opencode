@@ -507,6 +507,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     {
       title: "Toggle MCPs",
       value: "mcp.list",
+      search: "toggle mcps",
       category: "Agent",
       slash: {
         name: "mcps",
@@ -613,6 +614,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     {
       title: mode() === "dark" ? "Switch to light mode" : "Switch to dark mode",
       value: "theme.switch_mode",
+      search: "toggle appearance",
       onSelect: (dialog) => {
         setMode(mode() === "dark" ? "light" : "dark")
         dialog.clear()
@@ -661,6 +663,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     },
     {
       title: "Toggle debug panel",
+      search: "toggle debug",
       category: "System",
       value: "app.debug",
       onSelect: (dialog) => {
@@ -670,6 +673,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     },
     {
       title: "Toggle console",
+      search: "toggle console",
       category: "System",
       value: "app.console",
       onSelect: (dialog) => {
@@ -711,6 +715,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     {
       title: terminalTitleEnabled() ? "Disable terminal title" : "Enable terminal title",
       value: "terminal.title.toggle",
+      search: "toggle terminal title",
       keybind: "terminal_title_toggle",
       category: "System",
       onSelect: (dialog) => {
@@ -726,6 +731,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     {
       title: kv.get("animations_enabled", true) ? "Disable animations" : "Enable animations",
       value: "app.toggle.animations",
+      search: "toggle animations",
       category: "System",
       onSelect: (dialog) => {
         kv.set("animations_enabled", !kv.get("animations_enabled", true))
@@ -769,6 +775,7 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     {
       title: kv.get("diff_wrap_mode", "word") === "word" ? "Disable diff wrapping" : "Enable diff wrapping",
       value: "app.toggle.diffwrap",
+      search: "toggle diff wrapping",
       category: "System",
       onSelect: (dialog) => {
         const current = kv.get("diff_wrap_mode", "word")
